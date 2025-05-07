@@ -1,33 +1,57 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use crate::{patterns::Patterns, trie::TrieNode, utils::fix_string, words::Words};
+use serde::Deserialize;
+
+use crate::{
+    trie::{Trie, TrieNode},
+    utils::fix_string,
+};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Block {
+    pub transliterate: Vec<String>,
+    pub entire_block_optional: Option<bool>,
+}
 
 pub struct Suggest {
-    patterns: Patterns,
-    words: Words,
+    patterns: HashMap<String, Block>,
+    patterns_trie: Trie,
+    words: Trie,
+    common_suffixes: Vec<String>,
 }
 
 impl Suggest {
     pub fn new() -> Self {
-        let patterns = Patterns::new();
-        let words = Words::new();
+        let patterns_data = include_bytes!("../data/preprocessed-patterns.json");
+        let words_data = include_str!("../data/source-words.txt");
+        let common_data = include_bytes!("../data/source-common-patterns.json");
 
-        Suggest { patterns, words }
+        let patterns: HashMap<String, Block> = serde_json::from_slice(patterns_data).unwrap();
+        let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
+        let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
+        let common_suffixes = serde_json::from_slice(common_data).unwrap();
+
+        Suggest {
+            patterns,
+            patterns_trie,
+            words,
+            common_suffixes,
+        }
     }
 
     pub fn suggest(&self, input: &str) -> Vec<String> {
-        let word = fix_string(input);
-        let mut suggestions: HashSet<String> = HashSet::new();
+        let input = fix_string(input);
 
-        let (matched, mut remaining, _, _) = self.patterns.trie.match_longest_common_prefix(&word);
+        let (matched, mut remaining, _) = self.patterns_trie.match_longest_common_prefix(&input);
 
-        let matched_patterns = &self.patterns.dict.get(&matched).unwrap().transliterate;
-        let common_patterns_len = self.patterns.common.len();
+        let matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
+        let common_patterns_len = self.common_suffixes.len();
         let mut matched_nodes: Vec<&TrieNode> =
             Vec::with_capacity(matched_patterns.len() * common_patterns_len);
 
         for p in matched_patterns {
-            if let Some(node) = self.words.trie.matching_node(p) {
+            if let Some(node) = self.words.matching_node(p) {
                 matched_nodes.push(node);
             }
 
@@ -36,8 +60,8 @@ impl Suggest {
                 Vec::with_capacity(matched_nodes.len() * common_patterns_len);
 
             for matched_node in matched_nodes.iter() {
-                for common in self.patterns.common.iter() {
-                    if let Some(node) = matched_node.matching_node(common) {
+                for suffix in self.common_suffixes.iter() {
+                    if let Some(node) = matched_node.get_matching_node(suffix) {
                         additional_nodes.push(node);
                     }
                 }
@@ -47,19 +71,18 @@ impl Suggest {
             matched_nodes.extend(additional_nodes);
         }
 
-        while remaining.len() > 0 {
-            let (mut new_matched, mut new_remaining, mut complete, _) =
-                self.patterns.trie.match_longest_common_prefix(&remaining);
+        while !remaining.is_empty() {
+            let (mut new_matched, mut new_remaining, mut complete) =
+                self.patterns_trie.match_longest_common_prefix(&remaining);
 
             if !complete {
                 for i in (0..remaining.len()).rev() {
-                    (new_matched, new_remaining, complete, _) = self
-                        .patterns
-                        .trie
+                    (new_matched, new_remaining, complete) = self
+                        .patterns_trie
                         .match_longest_common_prefix(&remaining[..i]);
 
                     if complete {
-                        remaining = remaining[i..].to_string();
+                        remaining = &remaining[i..];
                         break;
                     }
                 }
@@ -67,13 +90,13 @@ impl Suggest {
                 remaining = new_remaining;
             }
 
-            let new_matched_patterns = &self.patterns.dict.get(&new_matched).unwrap().transliterate;
+            let new_matched_patterns = &self.patterns.get(new_matched).unwrap().transliterate;
             let mut new_matched_nodes: Vec<&TrieNode> =
                 Vec::with_capacity(new_matched_patterns.len());
 
             for p in new_matched_patterns {
                 for node in matched_nodes.iter() {
-                    if let Some(new_node) = node.matching_node(p) {
+                    if let Some(new_node) = node.get_matching_node(p) {
                         new_matched_nodes.push(new_node);
                     }
                 }
@@ -81,8 +104,7 @@ impl Suggest {
 
             if self
                 .patterns
-                .dict
-                .get(&new_matched)
+                .get(new_matched)
                 .unwrap()
                 .entire_block_optional
                 .is_some()
@@ -98,8 +120,8 @@ impl Suggest {
                 Vec::with_capacity(matched_nodes.len() * common_patterns_len);
 
             for matched_node in matched_nodes.iter() {
-                for common in self.patterns.common.iter() {
-                    if let Some(node) = matched_node.matching_node(common) {
+                for suffix in self.common_suffixes.iter() {
+                    if let Some(node) = matched_node.get_matching_node(suffix) {
                         additional_nodes.push(node);
                     }
                 }
@@ -109,12 +131,8 @@ impl Suggest {
             matched_nodes.extend(additional_nodes);
         }
 
-        for node in matched_nodes.iter() {
-            if let Some(word) = node.word.as_ref() {
-                suggestions.insert(word.clone());
-            }
-        }
-
+        let suggestions: HashSet<String> =
+            matched_nodes.iter().filter_map(|n| n.get_word()).collect();
         suggestions.into_iter().collect()
     }
 }

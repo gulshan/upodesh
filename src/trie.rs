@@ -1,27 +1,30 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrieNode {
-    children: HashMap<char, TrieNode>,
-    pub word: Option<String>, // Store the complete word at the end of the node
+    children: BTreeMap<char, TrieNode>,
+    word: Option<String>, // Store the complete word at the end of the node
 }
 
 impl TrieNode {
     fn new() -> Self {
         TrieNode {
-            children: HashMap::new(),
+            children: BTreeMap::new(),
             word: None,
         }
     }
 
-    pub fn is_complete_word(&self) -> bool {
+    fn is_complete_word(&self) -> bool {
         self.word.is_some()
     }
 
-    pub fn find_complete_words(&self) -> Vec<String> {
+    pub fn get_word(&self) -> Option<String> {
+        self.word.clone()
+    }
+
+    fn find_complete_words(&self) -> Vec<String> {
         let mut words = Vec::new();
-        for key in self.children.keys() {
-            let node = &self.children[key];
+        for node in self.children.values() {
             if let Some(word) = &node.word {
                 words.push(word.clone());
             }
@@ -34,7 +37,7 @@ impl TrieNode {
     }
 
     /// FindMatchingNode
-    pub fn matching_node(&self, word: &str) -> Option<&TrieNode> {
+    pub fn get_matching_node(&self, word: &str) -> Option<&TrieNode> {
         let mut current_node = self;
         for ch in word.chars() {
             match current_node.children.get(&ch) {
@@ -51,19 +54,27 @@ pub struct Trie {
 }
 
 impl Trie {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Trie {
             root: TrieNode::new(),
         }
     }
 
-    pub fn insert(&mut self, word: &str) {
+    fn insert(&mut self, word: &str) {
         let mut current_node = &mut self.root;
         for ch in word.chars() {
             current_node = current_node.children.entry(ch).or_insert(TrieNode::new());
         }
 
         current_node.word = Some(word.to_string()); // Store the word at the end of the node
+    }
+
+    pub fn from_strings<'a>(words: impl Iterator<Item = &'a str>) -> Self {
+        let mut trie = Trie::new();
+        for word in words {
+            trie.insert(word);
+        }
+        trie
     }
 
     /// FindMatchingNode
@@ -79,25 +90,21 @@ impl Trie {
     }
 
     /// findLongestPrefixNode
-    pub fn longest_prefix(&self, word: &str) -> Option<(&TrieNode, String)> {
+    fn longest_prefix(&self, word: &str) -> (&TrieNode, usize) {
         let mut current_node = &self.root;
-        let mut longest_prefix = String::new();
+        let mut prefix_len: usize = 0;
 
         for ch in word.chars() {
             match current_node.children.get(&ch) {
                 Some(node) => {
-                    longest_prefix.push(ch);
+                    prefix_len += ch.len_utf8();
                     current_node = node;
                 }
                 None => break,
             }
         }
 
-        if longest_prefix.is_empty() {
-            None
-        } else {
-            Some((current_node, longest_prefix))
-        }
+        (current_node, prefix_len)
     }
 
     /// MatchPrefix
@@ -108,7 +115,8 @@ impl Trie {
             return result;
         }
 
-        let Some((node, _)) = self.longest_prefix(prefix) else {
+        let (node, prefix_len) = self.longest_prefix(prefix);
+        if prefix_len == 0 {
             return result;
         };
 
@@ -122,23 +130,14 @@ impl Trie {
     }
 
     /// MatchLongestCommonPrefix
-    pub fn match_longest_common_prefix(
-        &self,
-        prefix: &str,
-    ) -> (String, String, bool, Option<&TrieNode>) {
-        let mut remaining = prefix.to_string();
-
+    pub fn match_longest_common_prefix<'a>(&self, prefix: &'a str) -> (&'a str, &'a str, bool) {
         if prefix.is_empty() {
-            return ("".to_string(), "".to_string(), false, None);
+            return ("", "", false);
         }
 
-        let Some((node, matched_prefix)) = self.longest_prefix(prefix) else {
-            return ("".to_string(), prefix.to_string(), false, None);
-        };
-
-        remaining = prefix[matched_prefix.len()..].to_string();
-
-        return (matched_prefix, remaining, node.word.is_some(), Some(node));
+        let (node, matched_prefix_len) = self.longest_prefix(prefix);
+        let (matched_prefix, remaining) = prefix.split_at(matched_prefix_len);
+        (matched_prefix, remaining, node.word.is_some())
     }
 }
 
@@ -146,38 +145,30 @@ impl Trie {
 mod tests {
     use super::*;
 
-    fn build_trie(entries: &[&str]) -> Trie {
-        let mut trie = Trie::new();
-        for entry in entries {
-            trie.insert(entry);
-        }
-        trie
-    }
-
     #[test]
     fn test_find_matching_node() {
-        let trie = build_trie(&["ক", "কখ", "কখগঘঙচছ"]);
+        let trie = Trie::from_strings(["ক", "কখ", "কখগঘঙচছ"].into_iter());
 
         let n1 = trie.matching_node("ক").unwrap();
 
-        let n2 = n1.matching_node("খ").unwrap();
+        let n2 = n1.get_matching_node("খ").unwrap();
 
-        _ = n2.matching_node("গঘ").unwrap();
+        _ = n2.get_matching_node("গঘ").unwrap();
 
         _ = trie.matching_node("কখগঘ").unwrap();
     }
 
     #[test]
     fn test_is_complete_word() {
-        let trie = build_trie(&["ক", "কখ", "কখগঘঙচছ"]);
+        let trie = Trie::from_strings(["ক", "কখ", "কখগঘঙচছ"].into_iter());
 
         let n1 = trie.matching_node("ক").unwrap();
         assert!(n1.is_complete_word());
 
-        let n2 = n1.matching_node("খ").unwrap();
+        let n2 = n1.get_matching_node("খ").unwrap();
         assert!(n2.is_complete_word());
 
-        let n3 = n2.matching_node("গঘ").unwrap();
+        let n3 = n2.get_matching_node("গঘ").unwrap();
         assert!(!n3.is_complete_word());
 
         let n4 = trie.matching_node("কখগঘ").unwrap();
@@ -186,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_match_prefix() {
-        let trie = build_trie(&["ক", "কখগ", "কখগঘঙ", "চ", "চছজ", "চছজঝঞ", "১"]);
+        let trie = Trie::from_strings(["ক", "কখগ", "কখগঘঙ", "চ", "চছজ", "চছজঝঞ", "১"].into_iter());
 
         assert_eq!(trie.match_prefix("ক"), vec!["কখগ", "কখগঘঙ", "ক"]);
         assert_eq!(trie.match_prefix("কখ"), vec!["কখগ", "কখগঘঙ"]);
@@ -197,27 +188,20 @@ mod tests {
 
     #[test]
     fn test_match_longest_common_prefix() {
-        let trie = build_trie(&["ক", "কখগ", "কখগঘঙ", "চ", "চছজ", "চছজঝঞ", "১"]);
+        let trie = Trie::from_strings(["ক", "কখগ", "কখগঘঙ", "চ", "চছজ", "চছজঝঞ", "১"].into_iter());
 
-        fn t(t: (String, String, bool, Option<&TrieNode>)) -> (String, String, bool) {
-            (t.0, t.1, t.2)
-        }
-
+        assert_eq!(trie.match_longest_common_prefix("ক"), ("ক", "", true));
         assert_eq!(
-            t(trie.match_longest_common_prefix("ক")),
-            ("ক".to_string(), "".to_string(), true)
-        );
-        assert_eq!(
-            t(trie.match_longest_common_prefix("ক1234")),
-            ("ক".to_string(), "1234".to_string(), true)
+            trie.match_longest_common_prefix("ক1234"),
+            ("ক", "1234", true)
         );
         assert_eq!(
             trie.match_longest_common_prefix("1234"),
-            ("".to_string(), "1234".to_string(), false, None)
+            ("", "1234", false)
         );
         assert_eq!(
-            t(trie.match_longest_common_prefix("কখগঘঙচছজঝঞ")),
-            ("কখগঘঙ".to_string(), "চছজঝঞ".to_string(), true)
+            trie.match_longest_common_prefix("কখগঘঙচছজঝঞ"),
+            ("কখগঘঙ", "চছজঝঞ", true)
         );
     }
 }
