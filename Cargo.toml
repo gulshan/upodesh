@@ -16,3 +16,6 @@ okkhor = { version = "0.7", features = ["regex"] }
 [[bench]]
 name = "suggestions"
 harness = false
+
+# [profile.release]
+# debug = true
