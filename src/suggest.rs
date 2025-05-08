@@ -172,5 +172,13 @@ mod tests {
         assert_eq!(sort(suggest.suggest("ongshocched")), vec!["অংশচ্ছেদ"]);
         assert_eq!(sort(suggest.suggest("shadhinota")), vec!["স্বাধীনতা"]);
         assert_eq!(sort(suggest.suggest("dukkho")), vec!["দুঃখ", "দুখ"]);
+        assert_eq!(sort(suggest.suggest("cool")), vec!["চুল", "চূল", "চোল", "ছুঁল", "ছুল", "ছোল"]);
+        assert_eq!(sort(suggest.suggest("shokti")), vec!["শকতি", "শক্তি", "সক্তি"]);
+        assert_eq!(sort(suggest.suggest("chup")), vec!["চুপ", "ছুপ"]);
+        assert_eq!(sort(suggest.suggest("as")), vec!["অশ্ব", "অশ্ম", "আঁশ", "আশ", "আস", "এস"]);
+        assert_eq!(sort(suggest.suggest("apni")), vec!["আপনি"]);
+        assert_eq!(sort(suggest.suggest("kkhet")), vec!["ক্ষেত", "খেঁট", "খেট", "খেত", "খ্যাঁট", "খ্যাঁত", "খ্যাত"]);
+        assert_eq!(sort(suggest.suggest("ebong")), vec!["এবং"]);
+        assert_eq!(sort(suggest.suggest("shesh")), vec!["শেষ", "সেস"]);
     }
 }
