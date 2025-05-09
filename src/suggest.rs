@@ -44,33 +44,16 @@ impl<'a> Suggest<'a> {
     pub fn suggest(&self, input: &str) -> Vec<String> {
         let input = fix_string(input);
 
-        let Some((key, val)) = self.find_pattern(&input) else {
-            return vec![];
-        };
-        let mut remaining = &input[key.len()..];
-        let mut matched_nodes = val
-            .transliterate
-            .iter()
-            .filter_map(|p| self.words.matching_node(p))
-            .collect::<Vec<_>>();
-
-        let additional_nodes = matched_nodes
-            .iter()
-            .flat_map(|node| {
-                self.common_suffixes
-                    .iter()
-                    .filter_map(|suffix| node.get_matching_node(suffix))
-            })
-            .collect::<Vec<_>>();
-        matched_nodes.extend(additional_nodes);
+        let mut remaining = &input[..];
+        let mut matched_nodes = vec![self.words.matching_node("").unwrap()];
 
         while !remaining.is_empty() {
-            let Some((key, new_val)) = self.find_pattern(remaining) else {
+            let Some((key, block)) = self.find_pattern(remaining) else {
                 break;
             };
             remaining = &remaining[key.len()..];
 
-            let new_matched_nodes = new_val
+            let new_matched_nodes = block
                 .transliterate
                 .iter()
                 .flat_map(|p| {
@@ -80,7 +63,7 @@ impl<'a> Suggest<'a> {
                 })
                 .collect::<Vec<_>>();
 
-            if new_val.entire_block_optional.is_some() {
+            if block.entire_block_optional == Some(true) {
                 // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
                 matched_nodes.extend(new_matched_nodes);
             } else {
