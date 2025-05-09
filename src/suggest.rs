@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::Deserialize;
 
-use crate::{trie::Trie, utils::fix_string};
+use crate::{
+    trie::{Trie, TrieNode},
+    utils::fix_string,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,46 +46,54 @@ impl<'a> Suggest<'a> {
 
     pub fn suggest(&self, input: &str) -> Vec<String> {
         let input = fix_string(input);
+        let matched_nodes = vec![self.words.matching_node("").unwrap()];
+        let suggestions = self.suggest_recursive(&input, matched_nodes);
+        suggestions.into_iter().map(|s| s.to_string()).collect()
+    }
 
-        let mut remaining = &input[..];
-        let mut matched_nodes = vec![self.words.matching_node("").unwrap()];
-
-        while !remaining.is_empty() {
-            let Some((key, block)) = self.find_pattern(remaining) else {
-                break;
-            };
-            remaining = &remaining[key.len()..];
-
-            let new_matched_nodes = block
-                .transliterate
-                .iter()
-                .flat_map(|p| {
-                    matched_nodes
-                        .iter()
-                        .filter_map(|node| node.get_matching_node(p))
-                })
-                .collect::<Vec<_>>();
-
-            if block.entire_block_optional == Some(true) {
-                // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
-                matched_nodes.extend(new_matched_nodes);
-            } else {
-                matched_nodes = new_matched_nodes;
-            }
-
-            let additional_matched_nodes = matched_nodes
-                .iter()
-                .flat_map(|node| {
-                    self.common_suffixes
-                        .iter()
-                        .filter_map(|suffix| node.get_matching_node(suffix))
-                })
-                .collect::<Vec<_>>();
-            matched_nodes.extend(additional_matched_nodes);
+    fn suggest_recursive(
+        &'a self,
+        remaining: &str,
+        mut matched_nodes: Vec<&'a TrieNode>,
+    ) -> HashSet<&'a str> {
+        if remaining.is_empty() {
+            return matched_nodes.iter().filter_map(|n| n.get_word()).collect();
         }
 
-        let suggestions: HashSet<_> = matched_nodes.iter().filter_map(|n| n.get_word()).collect();
-        suggestions.into_iter().map(|s| s.to_string()).collect()
+        let Some((key, block)) = self.find_pattern(remaining) else {
+            return matched_nodes.iter().filter_map(|n| n.get_word()).collect();
+        };
+
+        let remaining = &remaining[key.len()..];
+
+        let new_matched_nodes = block
+            .transliterate
+            .iter()
+            .flat_map(|p| {
+                matched_nodes
+                    .iter()
+                    .filter_map(|node| node.get_matching_node(p))
+            })
+            .collect::<Vec<_>>();
+
+        if block.entire_block_optional == Some(true) {
+            // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
+            matched_nodes.extend(new_matched_nodes);
+        } else {
+            matched_nodes = new_matched_nodes;
+        }
+
+        let additional_matched_nodes = matched_nodes
+            .iter()
+            .flat_map(|node| {
+                self.common_suffixes
+                    .iter()
+                    .filter_map(|suffix| node.get_matching_node(suffix))
+            })
+            .collect::<Vec<_>>();
+        matched_nodes.extend(additional_matched_nodes);
+
+        self.suggest_recursive(remaining, matched_nodes)
     }
 }
 
