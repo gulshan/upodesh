@@ -17,7 +17,7 @@ impl Suggest {
 
         let patterns: HashMap<String, Vec<String>> = serde_json::from_slice(patterns_data).unwrap();
         let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
-        let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
+        let words = Trie::from_strings(words_data.lines());
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
 
         Suggest {
@@ -37,17 +37,12 @@ impl Suggest {
         let mut matched_nodes = matched_patterns
             .iter()
             .filter_map(|p| self.words.matching_node(p))
-            .collect::<Vec<_>>();
-
-        let additional_nodes = matched_nodes
-            .iter()
             .flat_map(|node| {
                 self.common_suffixes
                     .iter()
                     .filter_map(|suffix| node.get_matching_node(suffix))
             })
             .collect::<Vec<_>>();
-        matched_nodes.extend(additional_nodes);
 
         while !remaining.is_empty() {
             let (mut new_matched, new_remaining, mut complete) =
@@ -76,17 +71,12 @@ impl Suggest {
                         .iter()
                         .filter_map(|node| node.get_matching_node(p))
                 })
-                .collect::<Vec<_>>();
-
-            let additional_matched_nodes = matched_nodes
-                .iter()
                 .flat_map(|node| {
                     self.common_suffixes
                         .iter()
                         .filter_map(|suffix| node.get_matching_node(suffix))
                 })
                 .collect::<Vec<_>>();
-            matched_nodes.extend(additional_matched_nodes);
         }
 
         let suggestions: HashSet<_> = matched_nodes.iter().filter_map(|n| n.get_word()).collect();
