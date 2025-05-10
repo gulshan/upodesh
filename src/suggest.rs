@@ -1,17 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 
-use serde::Deserialize;
-
 use crate::{trie::Trie, utils::fix_string};
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Block {
-    pub transliterate: Vec<String>,
-}
-
 pub struct Suggest<'a> {
-    patterns: BTreeMap<&'a str, Block>,
+    patterns: BTreeMap<&'a str, Vec<String>>,
     words: Trie,
     common_suffixes: Vec<String>,
 }
@@ -33,7 +25,7 @@ impl<'a> Suggest<'a> {
         }
     }
 
-    fn find_pattern(&self, input: &'a str) -> Option<(&&str, &Block)> {
+    fn find_pattern(&self, input: &'a str) -> Option<(&&str, &Vec<String>)> {
         let start = &input[..1];
         self.patterns
             .range(start..=input)
@@ -52,8 +44,7 @@ impl<'a> Suggest<'a> {
             };
             remaining = &remaining[key.len()..];
 
-            let new_matched_nodes = block
-                .transliterate
+            matched_nodes = block
                 .iter()
                 .flat_map(|p| {
                     matched_nodes
@@ -61,8 +52,6 @@ impl<'a> Suggest<'a> {
                         .filter_map(|node| node.get_matching_node(p))
                 })
                 .collect::<Vec<_>>();
-
-            matched_nodes = new_matched_nodes;
 
             let additional_matched_nodes = matched_nodes
                 .iter()
