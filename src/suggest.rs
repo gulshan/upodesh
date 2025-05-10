@@ -1,17 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use serde::Deserialize;
-
 use crate::{trie::Trie, utils::fix_string};
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Block {
-    pub transliterate: Vec<String>,
-}
-
 pub struct Suggest {
-    patterns: HashMap<String, Block>,
+    patterns: HashMap<String, Vec<String>>,
     patterns_trie: Trie,
     words: Trie,
     common_suffixes: Vec<String>,
@@ -23,7 +15,7 @@ impl Suggest {
         let words_data = include_str!("../data/source-words.txt");
         let common_data = include_bytes!("../data/source-common-patterns.json");
 
-        let patterns: HashMap<String, Block> = serde_json::from_slice(patterns_data).unwrap();
+        let patterns: HashMap<String, Vec<String>> = serde_json::from_slice(patterns_data).unwrap();
         let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
         let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
@@ -41,7 +33,7 @@ impl Suggest {
 
         let (matched, mut remaining, _) = self.patterns_trie.match_longest_common_prefix(&input);
 
-        let matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
+        let matched_patterns = &self.patterns.get(matched).unwrap();
         let mut matched_nodes = matched_patterns
             .iter()
             .filter_map(|p| self.words.matching_node(p))
@@ -76,17 +68,15 @@ impl Suggest {
                 remaining = new_remaining;
             }
 
-            let new_matched_patterns = &self.patterns.get(new_matched).unwrap().transliterate;
-            let new_matched_nodes = new_matched_patterns
+            let new_matched_patterns = &self.patterns.get(new_matched).unwrap();
+            matched_nodes = matched_nodes
                 .iter()
-                .flat_map(|p| {
-                    matched_nodes
+                .flat_map(|node| {
+                    new_matched_patterns
                         .iter()
-                        .filter_map(|node| node.get_matching_node(p))
+                        .filter_map(|p| node.get_matching_node(p))
                 })
                 .collect::<Vec<_>>();
-
-            matched_nodes = new_matched_nodes;
 
             let additional_matched_nodes = matched_nodes
                 .iter()
