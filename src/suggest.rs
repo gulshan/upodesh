@@ -8,7 +8,6 @@ use crate::{trie::Trie, utils::fix_string};
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     pub transliterate: Vec<String>,
-    pub entire_block_optional: Option<bool>,
 }
 
 pub struct Suggest {
@@ -59,12 +58,12 @@ impl Suggest {
         matched_nodes.extend(additional_nodes);
 
         while !remaining.is_empty() {
-            let (mut new_matched, mut new_remaining, mut complete) =
+            let (mut new_matched, new_remaining, mut complete) =
                 self.patterns_trie.match_longest_common_prefix(&remaining);
 
             if !complete {
                 for i in (0..remaining.len()).rev() {
-                    (new_matched, new_remaining, complete) = self
+                    (new_matched, _, complete) = self
                         .patterns_trie
                         .match_longest_common_prefix(&remaining[..i]);
 
@@ -87,18 +86,7 @@ impl Suggest {
                 })
                 .collect::<Vec<_>>();
 
-            if self
-                .patterns
-                .get(new_matched)
-                .unwrap()
-                .entire_block_optional
-                .is_some()
-            {
-                // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
-                matched_nodes.extend(new_matched_nodes);
-            } else {
-                matched_nodes = new_matched_nodes;
-            }
+            matched_nodes = new_matched_nodes;
 
             let additional_matched_nodes = matched_nodes
                 .iter()
