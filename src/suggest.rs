@@ -15,7 +15,7 @@ impl<'a> Suggest<'a> {
         let common_data = include_bytes!("../data/source-common-patterns.json");
 
         let patterns = serde_json::from_slice(patterns_data).unwrap();
-        let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
+        let words = Trie::from_strings(words_data.lines());
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
 
         Suggest {
@@ -51,17 +51,12 @@ impl<'a> Suggest<'a> {
                         .iter()
                         .filter_map(|node| node.get_matching_node(p))
                 })
-                .collect::<Vec<_>>();
-
-            let additional_matched_nodes = matched_nodes
-                .iter()
                 .flat_map(|node| {
                     self.common_suffixes
                         .iter()
                         .filter_map(|suffix| node.get_matching_node(suffix))
                 })
                 .collect::<Vec<_>>();
-            matched_nodes.extend(additional_matched_nodes);
         }
 
         let suggestions: HashSet<_> = matched_nodes.iter().filter_map(|n| n.get_word()).collect();
