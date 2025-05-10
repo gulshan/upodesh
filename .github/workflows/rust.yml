@@ -22,3 +22,5 @@ jobs:
       run: cargo test --verbose
     - name: Run benchmark
       run: cargo bench
+    - name: Get memory usage
+      run: cargo run --example alloc
