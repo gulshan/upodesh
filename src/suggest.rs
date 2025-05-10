@@ -40,7 +40,7 @@ impl Suggest {
     pub fn suggest(&self, input: &str) -> Vec<String> {
         let input = fix_string(input);
 
-        let (matched, mut remaining, _) = self.patterns_trie.match_longest_common_prefix(&input);
+        let (mut matched, mut remaining) = self.patterns_trie.match_longest_common_prefix(&input);
 
         let matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
         let mut matched_nodes = matched_patterns
@@ -59,25 +59,9 @@ impl Suggest {
         matched_nodes.extend(additional_nodes);
 
         while !remaining.is_empty() {
-            let (mut new_matched, mut new_remaining, mut complete) =
-                self.patterns_trie.match_longest_common_prefix(&remaining);
+            (matched, remaining) = self.patterns_trie.match_longest_common_prefix_complete(&remaining);
 
-            if !complete {
-                for i in (0..remaining.len()).rev() {
-                    (new_matched, new_remaining, complete) = self
-                        .patterns_trie
-                        .match_longest_common_prefix(&remaining[..i]);
-
-                    if complete {
-                        remaining = &remaining[i..];
-                        break;
-                    }
-                }
-            } else {
-                remaining = new_remaining;
-            }
-
-            let new_matched_patterns = &self.patterns.get(new_matched).unwrap().transliterate;
+            let new_matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
             let new_matched_nodes = new_matched_patterns
                 .iter()
                 .flat_map(|p| {
@@ -89,7 +73,7 @@ impl Suggest {
 
             if self
                 .patterns
-                .get(new_matched)
+                .get(matched)
                 .unwrap()
                 .entire_block_optional
                 .is_some()

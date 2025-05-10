@@ -47,6 +47,22 @@ impl<'a> TrieNode {
         }
         Some(current_node)
     }
+
+    /// findLongestPrefixNode
+    fn longest_complete_prefix(&self, input: &str) -> usize {
+        let Some(ch) = input.chars().next() else {
+            return 0;
+        };
+
+        if let Some(node) = self.children.get(&ch) {
+            let len = node.longest_complete_prefix(&input[ch.len_utf8()..]);
+            if len > 0 || node.is_complete_word() {
+                return len + ch.len_utf8();
+            };
+        }
+
+        0
+    }
 }
 
 pub struct Trie {
@@ -123,14 +139,16 @@ impl<'a> Trie {
     }
 
     /// MatchLongestCommonPrefix
-    pub fn match_longest_common_prefix(&self, prefix: &'a str) -> (&'a str, &'a str, bool) {
-        if prefix.is_empty() {
-            return ("", "", false);
-        }
-
-        let (node, matched_prefix_len) = self.longest_prefix(prefix);
+    pub fn match_longest_common_prefix(&self, prefix: &'a str) -> (&'a str, &'a str) {
+        let (_, matched_prefix_len) = self.longest_prefix(prefix);
         let (matched_prefix, remaining) = prefix.split_at(matched_prefix_len);
-        (matched_prefix, remaining, node.word.is_some())
+        (matched_prefix, remaining)
+    }
+    /// MatchLongestCommonPrefixComplete
+    pub fn match_longest_common_prefix_complete(&self, prefix: &'a str) -> (&'a str, &'a str) {
+        let matched_prefix_len = self.root.longest_complete_prefix(prefix);
+        let (matched_prefix, remaining) = prefix.split_at(matched_prefix_len);
+        (matched_prefix, remaining)
     }
 }
 
@@ -183,18 +201,12 @@ mod tests {
     fn test_match_longest_common_prefix() {
         let trie = Trie::from_strings(["ক", "কখগ", "কখগঘঙ", "চ", "চছজ", "চছজঝঞ", "১"].into_iter());
 
-        assert_eq!(trie.match_longest_common_prefix("ক"), ("ক", "", true));
-        assert_eq!(
-            trie.match_longest_common_prefix("ক1234"),
-            ("ক", "1234", true)
-        );
-        assert_eq!(
-            trie.match_longest_common_prefix("1234"),
-            ("", "1234", false)
-        );
+        assert_eq!(trie.match_longest_common_prefix("ক"), ("ক", ""));
+        assert_eq!(trie.match_longest_common_prefix("ক1234"), ("ক", "1234"));
+        assert_eq!(trie.match_longest_common_prefix("1234"), ("", "1234"));
         assert_eq!(
             trie.match_longest_common_prefix("কখগঘঙচছজঝঞ"),
-            ("কখগঘঙ", "চছজঝঞ", true)
+            ("কখগঘঙ", "চছজঝঞ")
         );
     }
 }
