@@ -8,7 +8,6 @@ use crate::{trie::Trie, utils::fix_string};
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     pub transliterate: Vec<String>,
-    pub entire_block_optional: Option<bool>,
 }
 
 pub struct Suggest<'a> {
@@ -63,12 +62,7 @@ impl<'a> Suggest<'a> {
                 })
                 .collect::<Vec<_>>();
 
-            if block.entire_block_optional == Some(true) {
-                // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
-                matched_nodes.extend(new_matched_nodes);
-            } else {
-                matched_nodes = new_matched_nodes;
-            }
+            matched_nodes = new_matched_nodes;
 
             let additional_matched_nodes = matched_nodes
                 .iter()
