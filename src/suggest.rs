@@ -1,10 +1,10 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{trie::Trie, utils::fix_string};
+use crate::utils::fix_string;
 
 pub struct Suggest<'a> {
     patterns: BTreeMap<&'a str, Vec<String>>,
-    words: Trie,
+    words: BTreeSet<&'a str>,
     common_suffixes: Vec<String>,
 }
 
@@ -15,7 +15,7 @@ impl<'a> Suggest<'a> {
         let common_data = include_bytes!("../data/source-common-patterns.json");
 
         let patterns = serde_json::from_slice(patterns_data).unwrap();
-        let words = Trie::from_strings(words_data.lines());
+        let words = BTreeSet::from_iter(words_data.lines());
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
 
         Suggest {
@@ -32,35 +32,43 @@ impl<'a> Suggest<'a> {
             .rfind(|(k, _)| input.starts_with(*k))
     }
 
+    fn prefix_exists(&self, input: &str) -> bool {
+        self.words
+            .range(input..format!("{}{}", input, char::MAX).as_str())
+            .next()
+            .is_some()
+    }
+
     pub fn suggest(&self, input: &str) -> Vec<String> {
         let input = fix_string(input);
 
         let mut remaining = &input[..];
-        let mut matched_nodes = vec![self.words.matching_node("").unwrap()];
+        let mut matched_nodes = vec![String::new()];
 
         while !remaining.is_empty() {
-            let Some((key, block)) = self.find_pattern(remaining) else {
+            let Some((key, patterns)) = self.find_pattern(remaining) else {
                 break;
             };
             remaining = &remaining[key.len()..];
 
-            matched_nodes = block
-                .iter()
-                .flat_map(|p| {
-                    matched_nodes
-                        .iter()
-                        .filter_map(|node| node.get_matching_node(p))
+            matched_nodes = matched_nodes
+                .iter_mut()
+                .flat_map(|r| {
+                    patterns.iter().flat_map(|p| {
+                        self.common_suffixes
+                            .iter()
+                            .map(|suffix| r.to_owned() + p + suffix)
+                    })
                 })
-                .flat_map(|node| {
-                    self.common_suffixes
-                        .iter()
-                        .filter_map(|suffix| node.get_matching_node(suffix))
-                })
+                .filter(|r| self.prefix_exists(r))
                 .collect::<Vec<_>>();
         }
 
-        let suggestions: HashSet<_> = matched_nodes.iter().filter_map(|n| n.get_word()).collect();
-        suggestions.into_iter().map(|s| s.to_string()).collect()
+        let suggestions: BTreeSet<_> = matched_nodes.iter().map(|s| s.as_str()).collect();
+        suggestions
+            .intersection(&self.words)
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
