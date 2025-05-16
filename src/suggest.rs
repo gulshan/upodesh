@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{trie::Trie, utils::fix_string};
 
 pub struct Suggest {
+    // For the patterns, an empty string is included in the value list to indicate that the pattern is optional
     patterns: HashMap<String, Vec<String>>,
     patterns_trie: Trie,
     words: Trie,
@@ -69,6 +70,8 @@ impl Suggest {
             }
 
             let new_matched_patterns = &self.patterns.get(new_matched).unwrap();
+            // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result.
+            // A pattern is marked as optional if it has an empty string in the value list.
             matched_nodes = matched_nodes
                 .iter()
                 .flat_map(|node| {
