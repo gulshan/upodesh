@@ -1,18 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use serde::Deserialize;
-
 use crate::{trie::Trie, utils::fix_string};
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Block {
-    pub transliterate: Vec<String>,
-    pub entire_block_optional: Option<bool>,
-}
-
 pub struct Suggest {
-    patterns: HashMap<String, Block>,
+    // For the patterns, an empty string is included in the value list to indicate that the pattern is optional
+    patterns: HashMap<String, Vec<String>>,
     patterns_trie: Trie,
     words: Trie,
     common_suffixes: Vec<String>,
@@ -24,7 +16,7 @@ impl Suggest {
         let words_data = include_str!("../data/source-words.txt");
         let common_data = include_bytes!("../data/source-common-patterns.json");
 
-        let patterns: HashMap<String, Block> = serde_json::from_slice(patterns_data).unwrap();
+        let patterns: HashMap<String, Vec<String>> = serde_json::from_slice(patterns_data).unwrap();
         let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
         let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
@@ -42,7 +34,7 @@ impl Suggest {
 
         let (matched, mut remaining, _) = self.patterns_trie.match_longest_common_prefix(&input);
 
-        let matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
+        let matched_patterns = &self.patterns.get(matched).unwrap();
         let mut matched_nodes = matched_patterns
             .iter()
             .filter_map(|p| self.words.matching_node(p))
@@ -59,12 +51,12 @@ impl Suggest {
         matched_nodes.extend(additional_nodes);
 
         while !remaining.is_empty() {
-            let (mut new_matched, mut new_remaining, mut complete) =
+            let (mut new_matched, new_remaining, mut complete) =
                 self.patterns_trie.match_longest_common_prefix(&remaining);
 
             if !complete {
                 for i in (0..remaining.len()).rev() {
-                    (new_matched, new_remaining, complete) = self
+                    (new_matched, _, complete) = self
                         .patterns_trie
                         .match_longest_common_prefix(&remaining[..i]);
 
@@ -77,28 +69,17 @@ impl Suggest {
                 remaining = new_remaining;
             }
 
-            let new_matched_patterns = &self.patterns.get(new_matched).unwrap().transliterate;
-            let new_matched_nodes = new_matched_patterns
+            let new_matched_patterns = &self.patterns.get(new_matched).unwrap();
+            // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result.
+            // A pattern is marked as optional if it has an empty string in the value list.
+            matched_nodes = matched_nodes
                 .iter()
-                .flat_map(|p| {
-                    matched_nodes
+                .flat_map(|node| {
+                    new_matched_patterns
                         .iter()
-                        .filter_map(|node| node.get_matching_node(p))
+                        .filter_map(|p| node.get_matching_node(p))
                 })
                 .collect::<Vec<_>>();
-
-            if self
-                .patterns
-                .get(new_matched)
-                .unwrap()
-                .entire_block_optional
-                .is_some()
-            {
-                // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
-                matched_nodes.extend(new_matched_nodes);
-            } else {
-                matched_nodes = new_matched_nodes;
-            }
 
             let additional_matched_nodes = matched_nodes
                 .iter()
