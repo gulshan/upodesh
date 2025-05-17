@@ -52,7 +52,7 @@ impl Suggest {
 
         while !remaining.is_empty() {
             let (mut new_matched, new_remaining, mut complete) =
-                self.patterns_trie.match_longest_common_prefix(&remaining);
+                self.patterns_trie.match_longest_common_prefix(remaining);
 
             if !complete {
                 for i in (0..remaining.len()).rev() {

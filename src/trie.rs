@@ -14,6 +14,7 @@ impl<'a> TrieNode {
         }
     }
 
+    #[cfg(test)]
     fn is_complete_word(&self) -> bool {
         self.word.is_some()
     }
@@ -22,6 +23,7 @@ impl<'a> TrieNode {
         self.word.as_deref()
     }
 
+    #[cfg(test)]
     fn find_complete_words(&'a self) -> Vec<&'a str> {
         let mut words = Vec::new();
         for node in self.children.values() {
@@ -101,6 +103,7 @@ impl<'a> Trie {
     }
 
     /// MatchPrefix
+    #[cfg(test)]
     pub fn match_prefix(&'a self, prefix: &'a str) -> Vec<&'a str> {
         let mut result = Vec::new();
 
