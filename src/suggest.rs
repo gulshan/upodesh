@@ -1,99 +1,74 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{trie::Trie, utils::fix_string};
+use crate::utils::fix_string;
 
-pub struct Suggest {
-    // For the patterns, an empty string is included in the value list to indicate that the pattern is optional
-    patterns: HashMap<String, Vec<String>>,
-    patterns_trie: Trie,
-    words: Trie,
+pub struct Suggest<'a> {
+    patterns: BTreeMap<&'a str, Vec<String>>,
+    words: BTreeSet<&'a str>,
     common_suffixes: Vec<String>,
 }
 
-impl Suggest {
+impl<'a> Suggest<'a> {
     pub fn new() -> Self {
         let patterns_data = include_bytes!("../data/preprocessed-patterns.json");
         let words_data = include_str!("../data/source-words.txt");
         let common_data = include_bytes!("../data/source-common-patterns.json");
 
-        let patterns: HashMap<String, Vec<String>> = serde_json::from_slice(patterns_data).unwrap();
-        let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
-        let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
+        let patterns = serde_json::from_slice(patterns_data).unwrap();
+        let words = BTreeSet::from_iter(words_data.lines());
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
 
         Suggest {
             patterns,
-            patterns_trie,
             words,
             common_suffixes,
         }
     }
 
+    fn find_pattern(&self, input: &'a str) -> Option<(&&str, &Vec<String>)> {
+        self.patterns
+            .range(..=input)
+            .rfind(|(k, _)| input.starts_with(*k))
+    }
+
+    fn prefix_exists(&self, input: &str) -> bool {
+        self.words
+            .range(input..format!("{}{}", input, char::MAX).as_str())
+            .next()
+            .is_some()
+    }
+
     pub fn suggest(&self, input: &str) -> Vec<String> {
         let input = fix_string(input);
 
-        let (matched, mut remaining, _) = self.patterns_trie.match_longest_common_prefix(&input);
-
-        let matched_patterns = &self.patterns.get(matched).unwrap();
-        let mut matched_nodes = matched_patterns
-            .iter()
-            .filter_map(|p| self.words.matching_node(p))
-            .collect::<Vec<_>>();
-
-        let additional_nodes = matched_nodes
-            .iter()
-            .flat_map(|node| {
-                self.common_suffixes
-                    .iter()
-                    .filter_map(|suffix| node.get_matching_node(suffix))
-            })
-            .collect::<Vec<_>>();
-        matched_nodes.extend(additional_nodes);
+        let mut remaining = &input[..];
+        let mut matched_strings = vec![String::new()];
 
         while !remaining.is_empty() {
-            let (mut new_matched, new_remaining, mut complete) =
-                self.patterns_trie.match_longest_common_prefix(remaining);
+            let Some((key, patterns)) = self.find_pattern(remaining) else {
+                break;
+            };
+            remaining = &remaining[key.len()..];
 
-            if !complete {
-                for i in (0..remaining.len()).rev() {
-                    (new_matched, _, complete) = self
-                        .patterns_trie
-                        .match_longest_common_prefix(&remaining[..i]);
-
-                    if complete {
-                        remaining = &remaining[i..];
-                        break;
-                    }
-                }
-            } else {
-                remaining = new_remaining;
-            }
-
-            let new_matched_patterns = &self.patterns.get(new_matched).unwrap();
-            // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result.
-            // A pattern is marked as optional if it has an empty string in the value list.
-            matched_nodes = matched_nodes
+            matched_strings = matched_strings
                 .iter()
-                .flat_map(|node| {
-                    new_matched_patterns
-                        .iter()
-                        .filter_map(|p| node.get_matching_node(p))
-                })
+                .flat_map(|m| patterns.iter().map(|p| m.to_owned() + p))
+                .filter(|m| self.prefix_exists(m))
                 .collect::<Vec<_>>();
 
-            let additional_matched_nodes = matched_nodes
+            let additional_matches = matched_strings
                 .iter()
-                .flat_map(|node| {
-                    self.common_suffixes
-                        .iter()
-                        .filter_map(|suffix| node.get_matching_node(suffix))
-                })
+                .flat_map(|m| self.common_suffixes.iter().map(|p| m.to_owned() + p))
+                .filter(|m| self.prefix_exists(m))
                 .collect::<Vec<_>>();
-            matched_nodes.extend(additional_matched_nodes);
+            matched_strings.extend(additional_matches);
         }
 
-        let suggestions: HashSet<_> = matched_nodes.iter().filter_map(|n| n.get_word()).collect();
-        suggestions.into_iter().map(|s| s.to_string()).collect()
+        let suggestions: BTreeSet<_> = matched_strings.iter().map(|s| s.as_str()).collect();
+        suggestions
+            .intersection(&self.words)
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
