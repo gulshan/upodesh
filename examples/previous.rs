@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use ahash::RandomState;
 use okkhor::parser::Parser;
+use peak_alloc::PeakAlloc;
 use regex::Regex;
+
+#[global_allocator]
+static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 fn main() {
     let Some(word) = std::env::args().nth(1) else {
@@ -65,8 +69,14 @@ fn main() {
             .collect()
     };
 
-    let suggestions = suggest(&word);
+    let mut suggestions = suggest(&word);
 
     println!("Word: {}", word);
+    suggestions.sort();
     println!("Suggestions: [{}]", suggestions.join(", "));
+
+    let current_mem = PEAK_ALLOC.current_usage_as_mb();
+    println!("This program currently uses {} MB of RAM.", current_mem);
+    let peak_mem = PEAK_ALLOC.peak_usage_as_mb();
+    println!("The max amount that was used {} MB.", peak_mem);
 }
