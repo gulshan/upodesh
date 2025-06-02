@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
-use crate::{fst::FstTree, utils::fix_string};
+use crate::fst::FstTree;
 
 static WORDS: Lazy<FstTree<&[u8]>> = Lazy::new(|| FstTree::from_fst(include_bytes!("words.fst")));
 
@@ -129,6 +129,25 @@ impl Suggest {
     }
 }
 
+fn fix_string(s: &str) -> String {
+    let s = s.trim();
+
+    let mut result = String::new();
+    let mut prev = ' '; // prev is non-alphabetic at first
+    for c in s.chars() {
+        // Fix string for o. In the beginning, after punctuations etc it should be capital O
+        if (c == 'o' || c == 'O') && !prev.is_ascii_alphabetic() {
+            result.push('O');
+        } else if c.is_ascii_alphanumeric() || c == '`' {
+            result.push(c.to_ascii_lowercase());
+        }
+
+        prev = c;
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,6 +155,15 @@ mod tests {
     fn sort(mut vec: Vec<String>) -> Vec<String> {
         vec.sort();
         vec
+    }
+
+    #[test]
+    fn test_fix_string() {
+        assert_eq!(fix_string("o"), "O");
+        assert_eq!(fix_string("o!"), "O");
+        assert_eq!(fix_string("o!o"), "OO");
+        assert_eq!(fix_string("osomapto"), "Osomapto");
+        assert_eq!(fix_string("6t``"), "6t``");
     }
 
     #[test]
