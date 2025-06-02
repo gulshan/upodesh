@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{trie::Trie, utils::fix_string};
+use crate::{trie::Trie};
 
 pub struct Suggest {
     // For the patterns, an empty string is included in the value list to indicate that the pattern is optional
@@ -18,7 +18,7 @@ impl Suggest {
 
         let patterns: HashMap<String, Vec<String>> = serde_json::from_slice(patterns_data).unwrap();
         let patterns_trie = Trie::from_strings(patterns.keys().map(|s| s.as_str()));
-        let words = Trie::from_strings(words_data.lines().map(|s| s.trim()));
+        let words = Trie::from_strings(words_data.lines());
         let common_suffixes = serde_json::from_slice(common_data).unwrap();
 
         Suggest {
@@ -97,9 +97,36 @@ impl Suggest {
     }
 }
 
+fn fix_string(s: &str) -> String {
+    let s = s.trim();
+
+    let mut result = String::new();
+    let mut prev = ' '; // prev is non-alphabetic at first
+    for c in s.chars() {
+        // Fix string for o. In the beginning, after punctuations etc it should be capital O
+        if (c == 'o' || c == 'O') && !prev.is_ascii_alphabetic() {
+            result.push('O');
+        } else if c.is_ascii_alphabetic() {
+            result.push(c.to_ascii_lowercase());
+        }
+
+        prev = c;
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_fix_string() {
+        assert_eq!(fix_string("o"), "O");
+        assert_eq!(fix_string("o!"), "O");
+        assert_eq!(fix_string("o!o"), "OO");
+        assert_eq!(fix_string("osomapto"), "Osomapto");
+    }
 
     #[test]
     fn test_suggestions() {
