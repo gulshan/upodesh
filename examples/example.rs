@@ -1,7 +1,6 @@
 use peak_alloc::PeakAlloc;
 use upodesh::suggest::Suggest;
 
-
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
