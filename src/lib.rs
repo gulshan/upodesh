@@ -1,3 +1,3 @@
-mod trie;
-mod utils;
+mod fst;
 pub mod suggest;
+mod utils;

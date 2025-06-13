@@ -2,8 +2,10 @@
 name = "upodesh"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [dependencies]
+fst = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -13,6 +15,11 @@ ahash = "0.8"
 regex = "1"
 okkhor = { version = "0.7", features = ["regex"] }
 peak_alloc = "0.2"
+
+[build-dependencies]
+fst = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [[bench]]
 name = "suggestions"
