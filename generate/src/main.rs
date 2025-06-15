@@ -2,6 +2,8 @@ use std::{
     collections::HashMap,
     fs::{File, read, read_to_string},
     io::BufWriter,
+    path::PathBuf,
+    env::var_os,
 };
 
 use fst::raw::Builder;
@@ -15,11 +17,15 @@ pub struct Block {
 }
 
 fn generate_words_fst() {
-    let file = File::create("src/words.fst").expect("Failed to create words.fst");
+    let root = PathBuf::from(var_os("CARGO_MANIFEST_DIR").unwrap());
+    let parent = root.parent().unwrap();
+    let dest = parent.join("src").join("words.fst");
+
+    let file = File::create(dest).expect("Failed to create words.fst");
     let writer = BufWriter::new(file);
 
     let mut fst = Builder::new(writer).unwrap();
-    let words = read_to_string("data/source-words.txt").expect("Failed to read source words file");
+    let words = read_to_string(parent.join("data/source-words.txt")).expect("Failed to read source words file");
 
     let mut words = words.lines().map(str::trim).collect::<Vec<_>>();
 
@@ -34,12 +40,16 @@ fn generate_words_fst() {
 }
 
 fn generate_patterns_fst() {
-    let file = File::create("src/patterns.fst").expect("Failed to create patterns.fst");
+    let root = PathBuf::from(var_os("CARGO_MANIFEST_DIR").unwrap());
+    let parent = root.parent().unwrap();
+    let dest = parent.join("src").join("patterns.fst");
+
+    let file = File::create(dest).expect("Failed to create patterns.fst");
     let writer = BufWriter::new(file);
 
     let mut fst = Builder::new(writer).unwrap();
     let patterns: HashMap<String, Block> = serde_json::from_slice(
-        &read("data/preprocessed-patterns.json").expect("Failed to read source patterns file"),
+        &read(parent.join("data/preprocessed-patterns.json")).expect("Failed to read source patterns file"),
     )
     .unwrap();
 
