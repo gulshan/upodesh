@@ -1,8 +1,12 @@
 [package]
 name = "upodesh"
+description = "A Rust library for generating Bengali word suggestions based on a given input string."
 version = "0.1.0"
 edition = "2024"
 build = "build.rs"
+license = "MIT"
+repository = "https://github.com/OpenBangla/upodesh"
+keywords = ["unicode", "bengali", "suggestion"]
 
 [dependencies]
 fst = "0.4"
