@@ -46,7 +46,12 @@ impl Suggest {
 
         let (matched, mut remaining, _) = patterns.match_longest_common_prefix(&input);
 
-        let matched_patterns = &self.patterns.get(matched).unwrap().transliterate;
+        let matched_patterns = if let Some(block) = self.patterns.get(matched) {
+            &block.transliterate
+        } else {
+            return vec![];
+        };
+
         let mut matched_nodes = matched_patterns
             .iter()
             .filter_map(|p| words.matching_node(p))
@@ -81,7 +86,13 @@ impl Suggest {
                 remaining = new_remaining;
             }
 
-            let new_matched_patterns = &self.patterns.get(new_matched).unwrap().transliterate;
+            let new_matched_patterns = if let Some(block) = self.patterns.get(new_matched) {
+                &block.transliterate
+            } else {
+                // If no patterns match, we can stop here
+                break;
+            };
+
             let new_matched_nodes = new_matched_patterns
                 .iter()
                 .flat_map(|p| {
@@ -94,9 +105,7 @@ impl Suggest {
             if self
                 .patterns
                 .get(new_matched)
-                .unwrap()
-                .entire_block_optional
-                .is_some()
+                .map_or(false, |v| v.entire_block_optional.is_some())
             {
                 // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
                 matched_nodes.extend(new_matched_nodes);
@@ -127,14 +136,14 @@ impl Suggest {
 mod tests {
     use super::*;
 
+    fn sort(mut vec: Vec<String>) -> Vec<String> {
+        vec.sort();
+        vec
+    }
+
     #[test]
     fn test_suggestions() {
         let suggest = Suggest::new();
-
-        fn sort(mut vec: Vec<String>) -> Vec<String> {
-            vec.sort();
-            vec
-        }
 
         assert_eq!(
             sort(suggest.suggest("sari")),
@@ -178,5 +187,14 @@ mod tests {
         );
         assert_eq!(sort(suggest.suggest("ebong")), vec!["এবং"]);
         assert_eq!(sort(suggest.suggest("shesh")), vec!["শেষ", "সেস"]);
+    }
+
+    #[test]
+    fn test_empty_suggestion() {
+        let suggest = Suggest::new();
+
+        assert_eq!(suggest.suggest("6t``"), Vec::<String>::new());
+        assert_eq!(suggest.suggest("6t`"), Vec::<String>::new());
+        assert_eq!(suggest.suggest("t6th"), Vec::<String>::new());
     }
 }
