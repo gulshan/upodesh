@@ -1,17 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::collections::{HashMap, HashSet};
 
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 use crate::{fst::FstTree, utils::fix_string};
 
-static WORDS: LazyLock<FstTree<&[u8]>> =
-    LazyLock::new(|| FstTree::from_fst(include_bytes!("words.fst")));
+static WORDS: Lazy<FstTree<&[u8]>> = Lazy::new(|| FstTree::from_fst(include_bytes!("words.fst")));
 
-static PATTERNS: LazyLock<FstTree<&[u8]>> =
-    LazyLock::new(|| FstTree::from_fst(include_bytes!("patterns.fst")));
+static PATTERNS: Lazy<FstTree<&[u8]>> =
+    Lazy::new(|| FstTree::from_fst(include_bytes!("patterns.fst")));
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,8 +37,8 @@ impl Suggest {
     }
 
     pub fn suggest(&self, input: &str) -> Vec<String> {
-        let words = LazyLock::force(&WORDS);
-        let patterns = LazyLock::force(&PATTERNS);
+        let words = Lazy::force(&WORDS);
+        let patterns = Lazy::force(&PATTERNS);
         let input = fix_string(input);
 
         let (matched, mut remaining, _) = patterns.match_longest_common_prefix(&input);
@@ -70,7 +67,7 @@ impl Suggest {
 
         while !remaining.is_empty() {
             let (mut new_matched, new_remaining, mut complete) =
-                patterns.match_longest_common_prefix(&remaining);
+                patterns.match_longest_common_prefix(remaining);
 
             if !complete {
                 for i in (0..remaining.len()).rev() {
