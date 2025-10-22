@@ -10,7 +10,9 @@ use upodesh::avro::Suggest;
 fn upodesh_avro_benchmark(c: &mut Criterion) {
     let suggest = Suggest::new();
 
-    c.bench_function("upodesh avro a", |b| b.iter(|| suggest.suggest(black_box("a"))));
+    c.bench_function("upodesh avro a", |b| {
+        b.iter(|| suggest.suggest(black_box("a")))
+    });
     c.bench_function("upodesh avro arO", |b| {
         b.iter(|| suggest.suggest(black_box("arO")))
     });

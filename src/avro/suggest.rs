@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
-use crate::{fst::FstTree, avro::utils::fix_string, WORDS};
+use crate::{avro::utils::fix_string, fst::FstTree, WORDS};
 
 static PATTERNS: Lazy<FstTree<&[u8]>> =
     Lazy::new(|| FstTree::from_fst(include_bytes!("patterns.fst")));
