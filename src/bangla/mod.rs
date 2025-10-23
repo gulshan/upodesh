@@ -12,6 +12,10 @@ const CHARS: [char; 61] = [
 ];
 
 pub fn suggest(word: &str) -> Vec<String> {
+    if word.is_empty() {
+        return Vec::new();
+    }
+    
     let words = Lazy::force(&WORDS);
 
     let need_chars_upto = match word.chars().count() {
@@ -65,6 +69,7 @@ mod tests {
 
     #[test]
     fn test_suggestions() {
+        assert_eq!(sort(sort(suggest(""))), Vec::<String>::new());
         assert_eq!(sort(sort(suggest("আমা"))), ["আমান", "আমার", "আমায়"]);
         assert_eq!(
             sort(sort(suggest("ই"))),
