@@ -11,24 +11,42 @@ impl<D: AsRef<[u8]>> FstTree<D> {
         Self { fst }
     }
 
-    pub fn match_longest_common_prefix<'a>(&self, prefix: &'a str) -> (&'a str, &'a str, bool) {
-        let mut iter = prefix.chars();
-        let mut index = 0;
+    pub fn match_longest_common_prefix<'a>(&self, prefix: &'a str) -> (&'a str, &'a str) {
         let mut node = self.fst.root();
+        let mut prefix_len = 0;
 
-        while let Some(c) = iter.next() {
+        for c in prefix.chars() {
             match node.find_input(c as u8) {
                 Some(addr) => {
+                    prefix_len += c.len_utf8();
                     node = self.fst.node(node.transition_addr(addr));
-                    index += c.len_utf8();
                 }
                 None => break,
             }
         }
 
-        let (matched_prefix, remaining) = prefix.split_at(index);
+        prefix.split_at(prefix_len)
+    }
 
-        (matched_prefix, remaining, node.is_final())
+    pub fn match_longest_common_prefix_complete<'a>(&self, prefix: &'a str) -> (&'a str, &'a str) {
+        let mut node = self.fst.root();
+        let mut prefix_len = 0;
+        let mut prefix_len_complete = 0;
+
+        for c in prefix.chars() {
+            match node.find_input(c as u8) {
+                Some(addr) => {
+                    prefix_len += c.len_utf8();
+                    node = self.fst.node(node.transition_addr(addr));
+                    if node.is_final() {
+                        prefix_len_complete = prefix_len;
+                    }
+                }
+                None => break,
+            }
+        }
+
+        prefix.split_at(prefix_len_complete)
     }
 
     pub fn matching_node<'a>(&'a self, word: &str) -> Option<FstNode<'a, D>> {
@@ -146,22 +164,34 @@ mod tests {
             "abcd",
         ]);
 
-        assert_eq!(fst.match_longest_common_prefix("ক"), ("ক", "", true));
+        assert_eq!(fst.match_longest_common_prefix("ক"), ("ক", ""));
+        assert_eq!(fst.match_longest_common_prefix_complete("ক"), ("ক", ""));
+        assert_eq!(fst.match_longest_common_prefix("ক1234"), ("ক", "1234"));
         assert_eq!(
-            fst.match_longest_common_prefix("ক1234"),
-            ("ক", "1234", true)
+            fst.match_longest_common_prefix_complete("ক1234"),
+            ("ক", "1234")
         );
-        assert_eq!(fst.match_longest_common_prefix("1234"), ("", "1234", false));
+        assert_eq!(fst.match_longest_common_prefix("1234"), ("", "1234"));
         assert_eq!(
             fst.match_longest_common_prefix("কখগঘঙচছজঝঞ"),
-            ("কখগঘঙ", "চছজঝঞ", true)
+            ("কখগঘঙ", "চছজঝঞ")
+        );
+        assert_eq!(
+            fst.match_longest_common_prefix_complete("কখগঘঙচছজঝঞ"),
+            ("কখগঘঙ", "চছজঝঞ")
         );
 
-        assert_eq!(fst.match_longest_common_prefix("a"), ("a", "", true));
-        assert_eq!(fst.match_longest_common_prefix("a123"), ("a", "123", true));
+        assert_eq!(fst.match_longest_common_prefix("a"), ("a", ""));
+        assert_eq!(fst.match_longest_common_prefix_complete("a"), ("a", ""));
+        assert_eq!(fst.match_longest_common_prefix("a123"), ("a", "123"));
         assert_eq!(
-            fst.match_longest_common_prefix("abcdefg"),
-            ("abcd", "efg", true)
+            fst.match_longest_common_prefix_complete("a123"),
+            ("a", "123")
+        );
+        assert_eq!(fst.match_longest_common_prefix("abcdefg"), ("abcd", "efg"));
+        assert_eq!(
+            fst.match_longest_common_prefix_complete("abcdefg"),
+            ("abcd", "efg")
         );
     }
 

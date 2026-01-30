@@ -39,7 +39,7 @@ impl Suggest {
         let patterns = Lazy::force(&PATTERNS);
         let input = fix_string(input);
 
-        let (matched, mut remaining, _) = patterns.match_longest_common_prefix(&input);
+        let (mut matched, mut remaining) = patterns.match_longest_common_prefix(&input);
 
         let matched_patterns = if let Some(block) = self.patterns.get(matched) {
             &block.transliterate
@@ -63,25 +63,10 @@ impl Suggest {
 
         matched_nodes.extend(additional_nodes);
 
-        while !remaining.is_empty() {
-            let (mut new_matched, new_remaining, mut complete) =
-                patterns.match_longest_common_prefix(remaining);
+        while !matched.is_empty() && !remaining.is_empty() {
+            (matched, remaining) = patterns.match_longest_common_prefix_complete(remaining);
 
-            if !complete {
-                for i in (0..remaining.len()).rev() {
-                    (new_matched, _, complete) =
-                        patterns.match_longest_common_prefix(&remaining[..i]);
-
-                    if complete {
-                        remaining = &remaining[i..];
-                        break;
-                    }
-                }
-            } else {
-                remaining = new_remaining;
-            }
-
-            let new_matched_patterns = if let Some(block) = self.patterns.get(new_matched) {
+            let new_matched_patterns = if let Some(block) = self.patterns.get(matched) {
                 &block.transliterate
             } else {
                 // If no patterns match, we can stop here
@@ -99,7 +84,7 @@ impl Suggest {
 
             if self
                 .patterns
-                .get(new_matched)
+                .get(matched)
                 .map_or(false, |v| v.entire_block_optional.is_some())
             {
                 // Entirely optional patterns like "([ওোঅ]|(অ্য)|(য়ো?))?" may not yield any result
